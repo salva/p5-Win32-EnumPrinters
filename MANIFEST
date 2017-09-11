@@ -1,8 +1,11 @@
 Changes
+const-c.inc
 EnumPrinters.xs
+helpers/make_constants.pl
+lib/Win32/EnumPrinters.pm
+lib/Win32/EnumPrinters/Constants.pm
 Makefile.PL
 MANIFEST
 ppport.h
 README
 t/Win32-EnumPrinters.t
-lib/Win32/EnumPrinters.pm

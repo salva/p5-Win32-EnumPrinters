@@ -1,8 +1,11 @@
 #define PERL_NO_GET_CONTEXT
+
+/* Windows Vista required */
+#define _WIN32_WINNT 0x600
+
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
-
 #include "ppport.h"
 
 #include "Winspool.h"
@@ -20,6 +23,17 @@ newSVdual(pTHX_ IV iv, const char *str) {
     SvIV_set(sv, iv);
     return sv;
 }
+
+/* Those definitions are missing from MinGW winspool.h */
+#ifndef STRING_NONE
+#define STRING_NONE     0x00000001L
+#endif
+#ifndef STRING_MUIDLL
+#define STRING_MUIDLL   0x00000002L
+#endif
+#ifndef STRING_LANGPAIR
+#define STRING_LANGPAIR 0x00000004L
+#endif
 
 /* #define DEBUG 1 */
 #include "const-c.inc"
@@ -39,7 +53,7 @@ union printer_info_all {
 #define DEFAULT_BUFFER_SIZE ((sizeof(union printer_info_all) * 20))
 
 static SV *
-wchar_to_sv(pTHX_ wchar_t *str, size_t wlen) {
+wchar_to_sv(pTHX_ const wchar_t *str, size_t wlen) {
     if (str)  {
         size_t len;
         if (!wlen) wlen = wcslen(str);
@@ -197,7 +211,6 @@ static SV *
 pi2_to_sv(pTHX_ PPRINTER_INFO_2W pi2) {
     HV *hv = newHV();
     SV *sv = sv_2mortal(newRV_noinc((SV*)hv));
-
     hv_stores(hv, "ServerName", wchar_to_sv(aTHX_ pi2->pServerName, 0));
     hv_stores(hv, "PrinterName", wchar_to_sv(aTHX_ pi2->pPrinterName, 0));
     hv_stores(hv, "ShareName", wchar_to_sv(aTHX_ pi2->pShareName, 0));
@@ -253,6 +266,58 @@ static SV *pi7_to_sv(pTHX_ PPRINTER_INFO_7W pi7) { return &PL_sv_undef; }
 static SV *pi8_to_sv(pTHX_ PPRINTER_INFO_8W pi8) { return &PL_sv_undef; }
 static SV *pi9_to_sv(pTHX_ PPRINTER_INFO_9W pi9) { return &PL_sv_undef; }
 
+static SV *
+sizel_to_sv(pTHX_ PSIZEL sl) {
+    HV *hv = newHV();
+    SV *sv = sv_2mortal(newRV_noinc((SV*)hv));
+    hv_stores(hv, "cx", newSViv(sl->cx));
+    hv_stores(hv, "cy", newSViv(sl->cy));
+    return sv;
+}
+
+static SV *
+rectl_to_sv(pTHX_ PRECTL r) {
+    HV *hv = newHV();
+    SV *sv = sv_2mortal(newRV_noinc((SV*)hv));
+    hv_stores(hv, "left", newSViv(r->left));
+    hv_stores(hv, "top", newSViv(r->top));
+    hv_stores(hv, "right", newSViv(r->right));
+    hv_stores(hv, "bottom", newSViv(r->bottom));
+    return sv;
+}
+
+static SV *
+fi1_to_sv(pTHX_ PFORM_INFO_1W fi1) {
+    HV *hv = newHV();
+    SV *sv = sv_2mortal(newRV_noinc((SV*)hv));
+    hv_stores(hv, "Flags", formflag_to_sv(aTHX_ fi1->Flags));
+    hv_stores(hv, "Name", wchar_to_sv(aTHX_ fi1->pName, 0));
+    hv_stores(hv, "Size", SvREFCNT_inc(sizel_to_sv(aTHX_ &fi1->Size)));
+    hv_stores(hv, "ImageableArea", SvREFCNT_inc(rectl_to_sv(aTHX_ &fi1->ImageableArea)));
+    return sv;
+}
+
+static SV *
+fi2_to_sv(pTHX_ PFORM_INFO_2W fi2) {
+    HV *hv = newHV();
+    SV *sv = sv_2mortal(newRV_noinc((SV*)hv));
+    DWORD st = fi2->StringType;
+    hv_stores(hv, "Flags", formflag_to_sv(aTHX_ fi2->Flags));
+    hv_stores(hv, "Name", wchar_to_sv(aTHX_ fi2->pName, 0));
+    hv_stores(hv, "Size", SvREFCNT_inc(sizel_to_sv(aTHX_ &fi2->Size)));
+    hv_stores(hv, "ImageableArea", SvREFCNT_inc(rectl_to_sv(aTHX_ &fi2->ImageableArea)));
+    hv_stores(hv, "Keyword", newSVpv(fi2->pKeyword, 0));
+    hv_stores(hv, "StringType", stringtype_to_sv(aTHX_ st));
+    if (st & STRING_MUIDLL) {
+        hv_stores(hv, "MuiDll", wchar_to_sv(aTHX_ fi2->pMuiDll, 0));
+        hv_stores(hv, "ResourceId", newSViv(fi2->dwResourceId));
+    }
+    if (st & STRING_LANGPAIR) {
+        hv_stores(hv, "DisplayName", wchar_to_sv(aTHX_ fi2->pDisplayName, 0));
+        hv_stores(hv, "LangId", newSViv(fi2->wLangId));
+    }
+    return sv;
+}
 
 MODULE = Win32::EnumPrinters		PACKAGE = Win32::EnumPrinters
 
@@ -313,3 +378,65 @@ PPCODE:
             XSRETURN(0);
         }
     }
+
+SV *
+GetDefaultPrinter()
+PREINIT:
+    DWORD len = 0;
+CODE:
+    RETVAL = &PL_sv_undef;
+    GetDefaultPrinterW(NULL, &len);
+    if (len) {
+        wchar_t *buffer;
+        Newx(buffer, len + 2, wchar_t);
+        if (GetDefaultPrinterW(buffer, &len))
+            RETVAL = wchar_to_sv(aTHX_ buffer, 0);
+    }
+OUTPUT:
+    RETVAL
+
+void
+EnumForms(SV *printer, int level = 2)
+PREINIT:
+    wchar_t *printer_wchar;
+    HANDLE handle = 0;
+    DWORD returned = 0;
+PPCODE:
+    printer_wchar = sv_to_wchar(aTHX_ printer);
+    if (OpenPrinterW(printer_wchar, &handle, NULL)) {
+        DWORD buffer_size = DEFAULT_BUFFER_SIZE;
+        while(1) {
+            DWORD required = 0;
+            LPBYTE buffer = NULL;
+            Newx(buffer, buffer_size, BYTE);
+            SAVEFREEPV(buffer);
+            if (EnumFormsW(handle, level, buffer, buffer_size, &required, &returned)) {
+                int i;
+                for (i = i; i < returned; i++) {
+                    SV *sv;
+                    switch(level) {
+                    case 1:
+                        sv = fi1_to_sv(aTHX_ (PFORM_INFO_1W)buffer + i);
+                        break;
+                    case 2:
+                        sv = fi2_to_sv(aTHX_ (PFORM_INFO_2W)buffer + i);
+                        break;
+                    default:
+                        Perl_warn(aTHX_ "level %d not supported", level);
+                        sv = &PL_sv_undef;
+                        break;
+                    }
+                    XPUSHs(sv);
+                }
+            }
+            else {
+                if (required > buffer_size) {
+                    buffer_size = required;
+                    continue;
+                }
+            }
+            break;
+        }
+        ClosePrinter(handle);
+    }
+    XSRETURN(returned);

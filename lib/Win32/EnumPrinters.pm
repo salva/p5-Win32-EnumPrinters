@@ -1,31 +1,24 @@
 package Win32::EnumPrinters;
 
-use 5.024001;
+our $VERSION = '0.01';
+
+use 5.010;
 use strict;
 use warnings;
 
-require Exporter;
-
-our @ISA = qw(Exporter);
-
-# Items to export into callers namespace by default. Note: do not export
-# names by default without a very good reason. Use EXPORT_OK instead.
-# Do not simply export all your public functions/methods/constants.
-
-# This allows declaration	use Win32::EnumPrinters ':all';
-# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
-# will save memory.
-
 use Win32::EnumPrinters::Constants;
-our %EXPORT_TAGS;
-$EXPORT_TAGS{subs} = [qw( EnumPrinters )];
+
+require Exporter;
+our @ISA = qw(Exporter);
+our %EXPORT_TAGS; # Win32::EnumPrinters::Constants initializes this!
+$EXPORT_TAGS{subs} = [qw( EnumPrinters EnumForms GetDefaultPrinter)];
 
 my %all;
 @all{@$_} = @$_ for values %EXPORT_TAGS;
 our @EXPORT_OK = keys %all;
 $EXPORT_TAGS{all} = \@EXPORT_OK;
 
-our $VERSION = '0.01';
+
 
 require XSLoader;
 XSLoader::load('Win32::EnumPrinters', $VERSION);
@@ -43,11 +36,8 @@ sub AUTOLOAD {
     goto &$AUTOLOAD;
 }
 
-# Preloaded methods go here.
-
 1;
 __END__
-# Below is stub documentation for your module. You'd better edit it!
 
 =head1 NAME
 

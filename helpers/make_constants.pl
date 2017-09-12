@@ -283,7 +283,16 @@ my %consts = ( enum           => [qw( PRINTER_ENUM_LOCAL
                                        DMDITHER_COARSE
                                        DMDITHER_FINE
                                        DMDITHER_LINEART
-                                       DMDITHER_GRAYSCALE)] );
+                                       DMDITHER_GRAYSCALE)],
+
+               formflag        => [qw( FORM_USER
+                                       FORM_BUILTIN
+                                       FORM_PRINTER )],
+
+               stringtype      => [qw( STRING_NONE
+                                       STRING_MUIDLL
+                                       STRING_LANGPAIR )],
+             );
 
 
 my %dups = map { $_ => 1 } qw(DMBIN_FORMSOURCE  DMBIN_ONLYONE DMBIN_UPPER DMPAPER_PENV_10_ROTATED);

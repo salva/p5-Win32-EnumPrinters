@@ -313,12 +313,17 @@ sub find_prefix {
 my $boot = '';
 
 open my $fh_c, '>', 'const-c.inc' or die "Unable to open 'const-c.inc': $!";
+open my $fh_tags, '>', 'tags.txt' or die "Unable to open 'tags.txt': $!";
+binmode $fh_tags;
+
 mkdir "lib/Win32/EnumPrinters";
 
 for my $group (sort keys %consts) {
     my @consts = @{$consts{$group}};
 
     my $prefix = find_prefix @consts;
+
+    print $fh_tags "$group => ${prefix}_*\n";
 
     print $fh_c <<END;
 static SV*
@@ -408,9 +413,10 @@ END
 close $fh_c;
 
 open my $fh_pm, '>', 'lib/Win32/EnumPrinters/Constants.pm' or die "Unable to open 'Constants.pm': $!";
-require Data::Dumper;
 print $fh_pm <<END;
-package Win32::EnumPrinters;
+package
+    Win32::EnumPrinters;
 END
+require Data::Dumper;
 print $fh_pm Data::Dumper->Dump([\%consts], ['*EXPORT_TAGS']), "\n";
 close $fh_pm;

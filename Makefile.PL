@@ -13,4 +13,9 @@ WriteMakefile(NAME          => 'Win32::EnumPrinters',
               AUTHOR        => 'Salvador Fandino <sfandino@yahoo.com>',
               LICENSE       => 'perl',
               INC           => '-I.',
+              META_MERGE    => {
+                  resources => {
+                      repository => 'https://github.com/salva/p5-Win32-EnumPrinters',
+                  },
+              },
              );
